@@ -31,8 +31,26 @@ export const AuthProvider = ({ children }) => {
     setUser(result.data);
   };
 
+  const register = async (userData) => {
+    const response = await fetch(`${API_URL}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(userData),
+    });
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.error || result.message || "Unable to create account. Please try again.",
+      );
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(result.data));
+    setUser(result.data);
+  };
+
   const value = useMemo(
-    () => ({ user, isAuthenticated: Boolean(user?.token), login }),
+    () => ({ user, isAuthenticated: Boolean(user?.token), login, register }),
     [user],
   );
 
