@@ -12,6 +12,8 @@ import Gallery from "./pages/Gallery";
 import Reservations from "./pages/Reservations";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
+import LoginRequired from "./components/LoginRequired";
+import { AuthProvider } from "./context/AuthContext";
 
 // Initialize QueryClient for React Query
 const queryClient = new QueryClient();
@@ -26,7 +28,8 @@ const App = () => (
       {/* Sonner for displaying modern, accessible toast notifications */}
       <Sonner />
       {/* BrowserRouter enables client-side routing */}
-      <BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
         {/* Main container for the application, set to take minimum full height and use flexbox for layout */}
         <div className="min-h-screen flex flex-col">
           {/* Navbar component, fixed at the top */}
@@ -44,7 +47,14 @@ const App = () => (
               {/* Route for the gallery page */}
               <Route path="/gallery" element={<Gallery />} />
               {/* Route for the reservations page */}
-              <Route path="/reservations" element={<Reservations />} />
+              <Route
+                path="/reservations"
+                element={
+                  <LoginRequired>
+                    <Reservations />
+                  </LoginRequired>
+                }
+              />
               {/* Route for the contact page */}
               <Route path="/contact" element={<Contact />} />
               <Route path="*" element={<NotFound />} />
@@ -53,7 +63,8 @@ const App = () => (
           {/* Footer component, fixed at the bottom */}
           <Footer />
         </div>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
