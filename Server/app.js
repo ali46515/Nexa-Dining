@@ -1,10 +1,10 @@
-import express from "express";
+import cors from "cors"
 import dotenv from "dotenv";
+import express from "express";
 import connectMongo from "./config/db.js";
 import errorHandler from "./middlewares/errorHandler.middleware.js";
 
 dotenv.config();
-
 // Connect to MongoDB
 connectMongo();
 
@@ -12,6 +12,9 @@ const app = express();
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
+
+// Middleware to enable CORS
+app.use(cors());
 
 // Middleware to parse URL-encoded request bodies
 app.use(express.urlencoded({ extended: true }));
