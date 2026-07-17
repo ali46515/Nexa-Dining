@@ -103,4 +103,4 @@ menuItemSchema.index({ category: 1, isAvailable: 1 });
 menuItemSchema.index({ isSpecial: 1, isAvailable: 1 });
 menuItemSchema.index({ name: 'text', description: 'text' });
 
-module.exports = mongoose.model('MenuItem', menuItemSchema);
+export default mongoose.model('MenuItem', menuItemSchema);
