@@ -49,8 +49,13 @@ export const AuthProvider = ({ children }) => {
     setUser(result.data);
   };
 
+  const logout = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setUser(null);
+  };
+
   const value = useMemo(
-    () => ({ user, isAuthenticated: Boolean(user?.token), login, register }),
+    () => ({ user, isAuthenticated: Boolean(user?.token), login, register, logout }),
     [user],
   );
 
