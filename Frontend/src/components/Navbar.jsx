@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "./ui/button";
+import { useAuth } from "../context/AuthContext";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -63,6 +65,10 @@ const Navbar = () => {
                 Reserve a Table
               </Button>
             </Link>
+            {user?.role === "admin" && (
+              <Link to="/admin" className="font-lato text-sm uppercase tracking-wider text-foreground hover:text-accent">Admin</Link>
+            )}
+            {user && <button onClick={logout} className="font-lato text-xs uppercase tracking-wider text-muted-foreground hover:text-accent">Sign out</button>}
           </div>
 
           {/* Mobile Menu Toggle */}
