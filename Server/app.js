@@ -1,4 +1,4 @@
-import cors from "cors"
+import cors from "cors";
 import path from "path";
 import dotenv from "dotenv";
 import express from "express";
@@ -35,22 +35,23 @@ app.use((req, res, next) => {
 });
 
 // Serve static files from the uploads directory
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Routes
 app.use("/api/auth", (await import("./routes/auth.routes.js")).default);
-app.use('/api/menu', (await import('./routes/menu.routes.js')).default);
+app.use("/api/menu", (await import("./routes/menu.routes.js")).default);
+app.use("/api/events", (await import("./routes/event.routes.js")).default);
+app.use("/api/gallery", (await import("./routes/gallery.routes.js")).default);
 
 // Middleware to handle errors
 app.use(errorHandler);
-
 
 app.listen(process.env.PORT, () => {
   console.log(process.env.PORT);
 });
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err, promise) => {
+process.on("unhandledRejection", (err, promise) => {
   console.log(`Error: ${err.message}`);
   server.close(() => process.exit(1));
 });
