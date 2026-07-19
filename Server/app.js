@@ -42,6 +42,10 @@ app.use("/api/auth", (await import("./routes/auth.routes.js")).default);
 app.use("/api/menu", (await import("./routes/menu.routes.js")).default);
 app.use("/api/events", (await import("./routes/event.routes.js")).default);
 app.use("/api/gallery", (await import("./routes/gallery.routes.js")).default);
+app.use(
+  "/api/reservations",
+  (await import("./routes/reservation.routes.js")).default,
+);
 
 // Middleware to handle errors
 app.use(errorHandler);
