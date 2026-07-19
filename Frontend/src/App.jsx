@@ -13,6 +13,8 @@ import Reservations from "./pages/Reservations";
 import Contact from "./pages/Contact";
 import NotFound from "./pages/NotFound";
 import LoginRequired from "./components/LoginRequired";
+import AdminRequired from "./components/AdminRequired";
+import AdminDashboard from "./pages/AdminDashboard";
 import { AuthProvider } from "./context/AuthContext";
 
 // Initialize QueryClient for React Query
@@ -57,6 +59,7 @@ const App = () => (
               />
               {/* Route for the contact page */}
               <Route path="/contact" element={<Contact />} />
+              <Route path="/admin" element={<AdminRequired><AdminDashboard /></AdminRequired>} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
