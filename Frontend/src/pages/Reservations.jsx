@@ -1,5 +1,7 @@
-import { useState } from "react";
-import { Calendar, MapPin, Clock, Users } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Calendar, Clock, MapPin, Users, LoaderCircle } from "lucide-react";
+import { api } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -9,286 +11,264 @@ import {
 } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
-import { Badge } from "../components/ui/badge";
 
+const toDateValue = (date) => date.toISOString().slice(0, 10);
 const Reservations = () => {
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState("");
+  const { user } = useAuth();
+  const [date, setDate] = useState(() =>
+    toDateValue(new Date(Date.now() + 86400000)),
+  );
   const [guests, setGuests] = useState("2");
-
-  const timeSlots = [
-    { time: "17:00", available: true },
-    { time: "17:30", available: true },
-    { time: "18:00", available: false },
-    { time: "18:30", available: true },
-    { time: "19:00", available: true },
-    { time: "19:30", available: false },
-    { time: "20:00", available: true },
-    { time: "20:30", available: true },
-    { time: "21:00", available: true },
-  ];
-
-  const generateCalendar = () => {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
-    const firstDay = new Date(currentYear, currentMonth, 1);
-    const lastDay = new Date(currentYear, currentMonth + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-
-    const days = [];
-    const current = new Date(startDate);
-
-    for (let i = 0; i < 42; i++) {
-      days.push(new Date(current));
-      current.setDate(current.getDate() + 1);
+  const [time, setTime] = useState("");
+  const [slots, setSlots] = useState([]);
+  const [form, setForm] = useState(() => ({
+    fullName: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
+    email: user?.email || "",
+    phone: user?.phone || "",
+    occasion: "none",
+    specialRequests: "",
+    dietaryRestrictions: "",
+  }));
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      fullName:
+        current.fullName ||
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
+      email: current.email || user?.email || "",
+      phone: current.phone || user?.phone || "",
+    }));
+  }, [user]);
+  useEffect(() => {
+    let current = true;
+    const load = async () => {
+      setLoadingSlots(true);
+      setError("");
+      try {
+        const result = await api(
+          `/api/reservations/timeslots?date=${date}&guestCount=${guests}`,
+        );
+        if (current) {
+          setSlots(result.data.timeSlots);
+          setTime((selected) =>
+            result.data.timeSlots.some(
+              (slot) => slot.time === selected && slot.isAvailable,
+            )
+              ? selected
+              : "",
+          );
+        }
+      } catch (err) {
+        if (current) setError(err.message);
+      } finally {
+        if (current) setLoadingSlots(false);
+      }
+    };
+    load();
+    return () => {
+      current = false;
+    };
+  }, [date, guests]);
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    if (!time) return setError("Please choose an available time slot.");
+    setSaving(true);
+    try {
+      await api("/api/reservations", {
+        method: "POST",
+        token: user.token,
+        body: {
+          ...form,
+          date,
+          time,
+          guestCount: Number(guests),
+          dietaryRestrictions: form.dietaryRestrictions
+            ? form.dietaryRestrictions
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean)
+            : [],
+        },
+      });
+      setMessage(
+        "Your reservation request has been received. We’ll email you with the confirmation.",
+      );
+      setTime("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
-
-    return days;
   };
-
-  const isToday = (date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const isCurrentMonth = (date) => {
-    const today = new Date();
-    return date.getMonth() === today.getMonth();
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
-
   return (
     <div className="min-h-screen bg-background pt-24">
       <div className="container mx-auto px-6 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Reservation Form */}
-          <div className="animate-fade-in">
-            <Card className="card-elegant">
-              <CardHeader>
-                <CardTitle className="text-2xl font-montserrat font-bold text-foreground">
-                  Make a Reservation
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Calendar */}
+          <Card className="card-elegant">
+            <CardHeader>
+              <CardTitle className="text-2xl">Make a Reservation</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={submit} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-5">
+                  <div>
+                    <Label htmlFor="date">Select date</Label>
+                    <Input
+                      id="date"
+                      className="mt-2"
+                      type="date"
+                      value={date}
+                      min={toDateValue(new Date())}
+                      max={toDateValue(new Date(Date.now() + 7776000000))}
+                      onChange={(e) => setDate(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="guests">Number of guests</Label>
+                    <select
+                      id="guests"
+                      className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={guests}
+                      onChange={(e) => setGuests(e.target.value)}
+                    >
+                      {Array.from({ length: 20 }, (_, index) => (
+                        <option key={index + 1}>{index + 1}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
                 <div>
-                  <Label className="text-sm font-montserrat font-medium text-foreground mb-4 block">
-                    Select Date
-                  </Label>
-                  <div className="bg-charcoal text-ivory rounded-lg p-4">
-                    <div className="text-center mb-4">
-                      <h3 className="text-lg font-montserrat font-semibold">
-                        {new Date().toLocaleDateString("en-US", {
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </h3>
+                  <Label>Available time slots</Label>
+                  {loadingSlots ? (
+                    <div className="py-5 flex items-center gap-2 text-muted-foreground">
+                      <LoaderCircle className="animate-spin" size={16} />
+                      Checking availability…
                     </div>
-
-                    <div className="grid grid-cols-7 gap-1 text-center text-xs mb-2">
-                      {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map(
-                        (day) => (
-                          <div key={day} className="p-2 text-ivory/60">
-                            {day}
-                          </div>
-                        )
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-1">
-                      {generateCalendar().map((date, index) => (
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+                      {slots.map((slot) => (
                         <button
-                          key={index}
-                          onClick={() => setSelectedDate(date)}
-                          disabled={date < new Date() || !isCurrentMonth(date)}
-                          className={`p-2 text-sm rounded transition-colors ${
-                            !isCurrentMonth(date)
-                              ? "text-ivory/30 cursor-not-allowed"
-                              : date < new Date()
-                              ? "text-ivory/50 cursor-not-allowed"
-                              : selectedDate?.toDateString() ===
-                                date.toDateString()
-                              ? "bg-terracotta text-ivory"
-                              : isToday(date)
-                              ? "bg-ivory/20 text-ivory hover:bg-terracotta"
-                              : "text-ivory hover:bg-ivory/20"
-                          }`}
+                          type="button"
+                          key={slot.time}
+                          disabled={!slot.isAvailable}
+                          onClick={() => setTime(slot.time)}
+                          className={`rounded px-3 py-2 text-sm ${!slot.isAvailable ? "bg-muted text-muted-foreground cursor-not-allowed" : time === slot.time ? "bg-accent text-accent-foreground" : "bg-secondary hover:bg-accent/20"}`}
                         >
-                          {date.getDate()}
+                          {slot.time}
                         </button>
                       ))}
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Number of Guests */}
-                <div>
-                  <Label className="text-sm font-montserrat font-medium text-foreground mb-2 block">
-                    Number of Guests
-                  </Label>
-                  <Select value={guests} onValueChange={setGuests}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                        <SelectItem key={num} value={num.toString()}>
-                          {num} Guest{num > 1 ? "s" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Available Time Slots */}
-                <div>
-                  <Label className="text-sm font-montserrat font-medium text-foreground mb-4 block">
-                    Available Time Slots
-                  </Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {timeSlots.map((slot) => (
-                      <button
-                        key={slot.time}
-                        onClick={() =>
-                          slot.available && setSelectedTime(slot.time)
-                        }
-                        disabled={!slot.available}
-                        className={`p-2 rounded text-sm font-lato transition-colors ${
-                          !slot.available
-                            ? "bg-muted text-muted-foreground cursor-not-allowed"
-                            : selectedTime === slot.time
-                            ? "bg-accent text-accent-foreground"
-                            : "bg-secondary text-foreground hover:bg-accent/20"
-                        }`}
-                      >
-                        {slot.time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Guest Details */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-montserrat font-semibold text-foreground">
-                    Your Details
-                  </h3>
-
+                <div className="grid md:grid-cols-2 gap-5">
                   <div>
-                    <Label
-                      htmlFor="fullName"
-                      className="text-sm font-montserrat font-medium text-foreground"
-                    >
-                      Full Name
-                    </Label>
+                    <Label htmlFor="name">Full name</Label>
                     <Input
-                      id="fullName"
-                      placeholder="John Doe"
-                      className="mt-1"
+                      id="name"
+                      className="mt-2"
+                      value={form.fullName}
+                      onChange={(e) =>
+                        setForm({ ...form, fullName: e.target.value })
+                      }
+                      required
                     />
                   </div>
-
                   <div>
-                    <Label
-                      htmlFor="email"
-                      className="text-sm font-montserrat font-medium text-foreground"
-                    >
-                      Email Address
-                    </Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="john.doe@example.com"
-                      className="mt-1"
-                    />
-                  </div>
-
-                  <div>
-                    <Label
-                      htmlFor="phone"
-                      className="text-sm font-montserrat font-medium text-foreground"
-                    >
-                      Phone Number
-                    </Label>
+                    <Label htmlFor="phone">Phone</Label>
                     <Input
                       id="phone"
-                      type="tel"
-                      placeholder="+1 (555) 123-4567"
-                      className="mt-1"
+                      className="mt-2"
+                      value={form.phone}
+                      onChange={(e) =>
+                        setForm({ ...form, phone: e.target.value })
+                      }
+                      required
                     />
                   </div>
                 </div>
-
-                {/* Special Requests */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-montserrat font-semibold text-foreground">
-                    Special Requests
-                  </h3>
-
+                <div>
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    className="mt-2"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="grid md:grid-cols-2 gap-5">
                   <div>
-                    <Label
-                      htmlFor="occasion"
-                      className="text-sm font-montserrat font-medium text-foreground"
+                    <Label htmlFor="occasion">Occasion</Label>
+                    <select
+                      id="occasion"
+                      className="mt-2 flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                      value={form.occasion}
+                      onChange={(e) =>
+                        setForm({ ...form, occasion: e.target.value })
+                      }
                     >
-                      Occasion
-                    </Label>
-                    <Select>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="birthday">Birthday</SelectItem>
-                        <SelectItem value="anniversary">Anniversary</SelectItem>
-                        <SelectItem value="business">
-                          Business Dinner
-                        </SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {[
+                        "none",
+                        "birthday",
+                        "anniversary",
+                        "business",
+                        "other",
+                      ].map((item) => (
+                        <option key={item} value={item}>
+                          {item === "none" ? "None" : item}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
                   <div>
-                    <Label
-                      htmlFor="dietary"
-                      className="text-sm font-montserrat font-medium text-foreground"
-                    >
-                      Allergies or Dietary Restrictions
-                    </Label>
-                    <Textarea
+                    <Label htmlFor="dietary">Dietary restrictions</Label>
+                    <Input
                       id="dietary"
-                      placeholder="e.g., Nut allergy, Gluten-free"
-                      className="mt-1"
-                      rows={3}
+                      className="mt-2"
+                      placeholder="e.g. vegetarian, nut allergy"
+                      value={form.dietaryRestrictions}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          dietaryRestrictions: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
-
-                <Button className="btn-terracotta w-full py-3 text-lg">
-                  Confirm Reservation
+                <div>
+                  <Label htmlFor="requests">Special requests</Label>
+                  <Textarea
+                    id="requests"
+                    className="mt-2"
+                    value={form.specialRequests}
+                    onChange={(e) =>
+                      setForm({ ...form, specialRequests: e.target.value })
+                    }
+                  />
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                {message && <p className="text-sm text-sage">{message}</p>}
+                <Button
+                  disabled={saving || loadingSlots}
+                  className="btn-terracotta w-full py-3"
+                >
+                  {saving ? "Submitting…" : "Confirm Reservation"}
                 </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Location & Info */}
+              </form>
+            </CardContent>
+          </Card>
           <div className="space-y-8 animate-slide-up">
             <Card className="card-elegant">
               <CardHeader>
@@ -314,39 +294,47 @@ const Reservations = () => {
               </CardContent>
             </Card>
 
-            {/* Reservation Summary */}
-            {selectedDate && selectedTime && (
-              <Card className="card-elegant animate-scale-in">
+            <aside className="space-y-6">
+              <Card className="card-elegant">
                 <CardHeader>
-                  <CardTitle className="text-xl font-montserrat font-bold text-foreground">
-                    Reservation Summary
-                  </CardTitle>
+                  <CardTitle>Reservation Summary</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Calendar size={16} className="text-accent" />
-                    <span className="font-lato text-sm">
-                      {formatDate(selectedDate)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock size={16} className="text-accent" />
-                    <span className="font-lato text-sm">{selectedTime}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Users size={16} className="text-accent" />
-                    <span className="font-lato text-sm">
-                      {guests} Guest{parseInt(guests) > 1 ? "s" : ""}
-                    </span>
-                  </div>
+                <CardContent className="space-y-4 text-muted-foreground">
+                  <p className="flex gap-3">
+                    <Calendar className="text-accent" size={18} />
+                    {new Date(`${date}T12:00:00`).toLocaleDateString(undefined, {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </p>
+                  <p className="flex gap-3">
+                    <Clock className="text-accent" size={18} />
+                    {time || "Choose a time"}
+                  </p>
+                  <p className="flex gap-3">
+                    <Users className="text-accent" size={18} />
+                    {guests} guest{guests !== "1" ? "s" : ""}
+                  </p>
                 </CardContent>
               </Card>
-            )}
+              <Card className="card-elegant">
+                <CardContent className="p-6">
+                  <h2 className="font-montserrat text-xl font-semibold">
+                    Dining at Nexa
+                  </h2>
+                  <p className="mt-3 text-muted-foreground">
+                    Reservations can be made up to three months ahead. Your table
+                    is held once the team confirms your request.
+                  </p>
+                </CardContent>
+              </Card>
+            </aside>
           </div>
         </div>
+
       </div>
     </div>
   );
 };
-
 export default Reservations;
